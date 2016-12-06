@@ -6,7 +6,7 @@ Feel free to copy this example and use [hasbolt](https://github.com/zmactep/hasb
 Build
 -----
 
-To build the project just close it and run build command by stack:
+To build the project just clone it and run build command by stack:
 ```
 git clone https://github.com/zmactep/hasbolt-sample-app.git
 cd hasbolt-sample-app
@@ -16,7 +16,6 @@ stack build
 Usage
 -----
 
-Just build and run:
 ```
 PORT=8080 stack exec hasbolt-sample-app-exe
 ```
@@ -73,7 +72,7 @@ runServer port = do state <- constructState defaultConfig
                       get  "/movie/:title" movieR
 ```
 
-Here we construct a new state by `constrictState :: BoltCfg -> ServerState` function from hardcoded default configuration and set a number of routes. Let's implement this routes.
+Here we construct a new state by `constrictState :: BoltCfg -> ServerState` function from hardcoded default configuration and set routes. Let's implement these routes.
 
 First of all we need to respond with static [index.html](https://github.com/zmactep/hasbolt-sample-app/blob/master/index.html) on "/" route ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/Routes.hs#L20)):
 ```haskell
@@ -115,7 +114,15 @@ graphR = do limit <- param "limit" `rescue` const (return 100)
 
 ### Database queries by hasbolt
 
-See comments in the code.
+To run queries we need to get a connection pool, get one `Pipe` and do a request by this pipe. All of this in the `runQ` function ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/Routes.hs#L15)):
+```haskell
+-- |Run BOLT action in scotty 'ActionT' monad transformer
+runQ :: BoltActionT IO a -> ActionT Text WebM a
+runQ act = do ss <- lift ask
+              liftIO $ withResource (pool ss) (`run` act)
+```
+
+See comments in the code to understand the query functions.
 
 Search ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/Data.hs#L27)):
 ```haskell
@@ -133,7 +140,7 @@ Movie ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/Da
 ```haskell
 -- |Returns movie by title
 queryMovie :: Text -> BoltActionT IO MovieInfo
-queryMovie title = do result <- head <$> queryP cypher params -- get first record from recieved record list by cypher query and params
+queryMovie title = do result <- head <$> queryP cypher params -- get first record from received record list by cypher query and params
                       T title <- result `at` "title"          -- get movie title as text (you also can use exact function here)
                       L members <- result `at` "cast"         -- get movie cast as list
                       cast <- traverse toCast members         -- serialize cast to jsonable data
@@ -151,7 +158,7 @@ Graph ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/Da
 ```haskell
 -- |Returns movies with all it's actors
 queryGraph :: Int -> BoltActionT IO MGraph
-queryGraph limit = do records <- queryP cypher params                        -- get first record from recieved record
+queryGraph limit = do records <- queryP cypher params                        -- get first record from received record
                       nodeTuples <- traverse toNodes records                 -- convert records to list of tuples (movie, [actors])
                       let movies = fst <$> nodeTuples                        -- get list of movies
                       let actors = nub $ concatMap snd nodeTuples            -- get list of actors

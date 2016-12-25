@@ -25,7 +25,7 @@ Cloud deployment
 
 To deploy on Heroku just follow these steps:
 ```
-export app=neo4j-movies-haskell-bolt-`whoami`
+export app=neo4j-movies-haskell-`whoami`
 heroku apps:create $app
 
 # Add neo4j addon and make it available from application

@@ -2,7 +2,7 @@
 
 module Data
     ( ServerState (..), WebM (..)
-    , constructState, defaultConfig
+    , constructState
     , querySearch, queryMovie, queryGraph
     ) where
 
@@ -64,10 +64,6 @@ queryGraph limit = do records <- queryP cypher params
                  "LIMIT {limit}"
         params = fromList [("limit", I limit)]
 
-
--- |Default configuration for localhost neo4j server
-defaultConfig :: BoltCfg
-defaultConfig = def {user = "neo4j", password = "neo4j"}
 
 -- |Create pool of connections (4 stripes, 500 ms timeout, 1 resource per stripe)
 constructState :: BoltCfg -> IO ServerState

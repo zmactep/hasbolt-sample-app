@@ -23,7 +23,28 @@ PORT=8080 stack exec hasbolt-sample-app-exe
 Cloud deployment
 ----------------
 
-**TODO:** write something here
+To deploy on Heroku just follow these steps:
+```
+export app=neo4j-movies-haskell-bolt-`whoami`
+heroku apps:create $app
+
+# Add neo4j addon and make it available from application
+heroku addons:add graphenedb:chalk --app $app
+
+# Set Haskell Stack buildpack
+heroku buildpacks:set https://github.com/mfine/heroku-buildpack-stack
+
+# deploy to heroku
+git push heroku master
+
+# open application
+heroku open --app $app
+
+# open addon admin page
+heroku addons:open graphenedb
+```
+
+In the Graphenedb-UI use “Launch Neo4j Admin UI”. In the Neo4j-Browser import the `:play movies` dataset.
 
 Under the hood
 --------------
@@ -34,13 +55,6 @@ Http backend uses [Scotty](https://github.com/scotty-web/scotty) web framework. 
 
 ### Server state
 
-We have default hardcoded Neo4j server parameters in this example ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/Data.hs#L68)):
-```haskell
--- |Default configuration for localhost neo4j server
-defaultConfig :: BoltCfg
-defaultConfig = def {user = "neo4j", password = "neo4j"}
-```
-
 First, we need to create a connection pool to out Neo4j database ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/Data.hs#L21)):
 ```haskell
 -- |A pool of connections to Neo4j server
@@ -50,7 +64,7 @@ data ServerState = ServerState { pool :: Pool Pipe }
 type WebM = ReaderT ServerState IO
 ```
 
-To create new connection pool we use `connect :: BoltCfg -> IO Pipe` and `close :: Pipe -> IO ()` functions from **hasbolt** to tell resource-pool how to create a new connection and how to close one ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/Data.hs#L72)):
+To create new connection pool we use `connect :: BoltCfg -> IO Pipe` and `close :: Pipe -> IO ()` functions from **hasbolt** to tell resource-pool how to create a new connection and how to close one ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/Data.hs#L68)):
 ```haskell
 -- |Create pool of connections (4 stripes, 500 ms timeout, 1 resource per stripe)
 constructState :: BoltCfg -> IO ServerState
@@ -62,14 +76,14 @@ constructState bcfg = do pool <- createPool (connect bcfg) close 4 500 1
 
 After we created a representation of our server state, we can create a simple server on given port ([source](https://github.com/zmactep/hasbolt-sample-app/blob/master/src/SimpleServer.hs#L18)):
 ```haskell
-runServer :: Port -> IO ()
-runServer port = do state <- constructState defaultConfig
-                    scottyT port (`runReaderT` state) $ do
-                      middleware logStdoutDev
-                      get  "/"             mainR
-                      get  "/graph"        graphR
-                      get  "/search"       searchR
-                      get  "/movie/:title" movieR
+runServer :: Port -> BoltCfg -> IO ()
+runServer port config = do state <- constructState config
+                           scottyT port (`runReaderT` state) $ do
+                             middleware logStdoutDev
+                             get  "/"             mainR
+                             get  "/graph"        graphR
+                             get  "/search"       searchR
+                             get  "/movie/:title" movieR
 ```
 
 Here we construct a new state by `constrictState :: BoltCfg -> ServerState` function from hardcoded default configuration and set routes. Let's implement these routes.
